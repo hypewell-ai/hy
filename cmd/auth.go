@@ -89,7 +89,10 @@ func runAuthLogin(cmd *cobra.Command, args []string) error {
 
 	// Build the auth URL
 	apiURL := GetAPIURL()
-	authURL := fmt.Sprintf("%s/../cli/auth?port=%d", strings.TrimSuffix(apiURL, "/api"), port)
+	// Remove /api suffix to get base URL
+	baseURL := strings.TrimSuffix(apiURL, "/api")
+	baseURL = strings.TrimSuffix(baseURL, "/")
+	authURL := fmt.Sprintf("%s/cli/auth?port=%d", baseURL, port)
 
 	fmt.Println("Opening browser to authenticate...")
 	fmt.Printf("If browser doesn't open, visit: %s\n\n", authURL)
