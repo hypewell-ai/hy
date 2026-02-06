@@ -6,16 +6,23 @@ Integration tests run against the live Hypewell Studio API using a dedicated tes
 
 ### 1. Create Test Workspace
 
-The test workspace `ws_integration_test` is used for all integration tests. Create it once:
+The test workspace `ws_integration_test` is used for all integration tests. Create it once in Firebase Console:
 
+1. Go to [Firebase Console](https://console.firebase.google.com/project/hypewell-prod/firestore)
+2. Navigate to Firestore → `workspaces` collection
+3. Add Document with ID: `ws_integration_test`
+4. Add fields:
+   - `id`: `ws_integration_test` (string)
+   - `name`: `Integration Tests` (string)
+   - `slug`: `integration-test` (string)
+   - `plan`: `free` (string)
+   - `createdAt`: (timestamp, now)
+   - `updatedAt`: (timestamp, now)
+
+Or run the setup script (requires Application Default Credentials):
 ```bash
-# Using Firebase CLI
-firebase firestore:set workspaces/ws_integration_test \
-  --project hypewell-prod \
-  --data '{"id":"ws_integration_test","name":"Integration Tests","slug":"integration-test","plan":"free"}'
+go run scripts/setup-test-workspace.go
 ```
-
-Or manually in Firebase Console → Firestore → workspaces → Add Document with ID `ws_integration_test`.
 
 ### 2. Create Test API Key
 
