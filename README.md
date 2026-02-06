@@ -1,4 +1,4 @@
-# hy
+# hy - Hypewell Studio CLI
 
 Command-line interface for Hypewell Studio.
 
@@ -13,13 +13,7 @@ brew install hy
 
 ### Binary Download
 
-Download from [Releases](https://github.com/hypewell-ai/hy/releases).
-
-### From Source
-
-```bash
-go install github.com/hypewell-ai/hy@latest
-```
+Download the latest release from [GitHub Releases](https://github.com/hypewell-ai/hy/releases).
 
 ## Quick Start
 
@@ -27,84 +21,97 @@ go install github.com/hypewell-ai/hy@latest
 # Authenticate
 hy auth login
 
-# List productions
+# List your productions
 hy productions list
 
-# Create a production
-hy productions create --name "My Video" --topic "Product Launch"
+# Create a new production
+hy create --name "Product Launch" --topic "New features announcement"
 
 # Trigger a build
-hy productions build prod_abc123
+hy build prod_xxx
 
-# Upload assets
-hy assets upload video.mp4
-
-# Manage API keys
-hy keys create --name "CI Integration"
-hy keys list
+# Chat with the AI assistant
+hy thread chat "How should I structure my video?"
 ```
 
 ## Commands
 
+### Authentication
+
+```bash
+hy auth login           # Log in and create API key
+hy auth logout          # Log out and revoke key
+hy auth status          # Show current auth status
 ```
-hy auth login       Authenticate with Hypewell Studio
-hy auth logout      Clear stored credentials
-hy auth status      Show current auth status
 
-hy productions list     List all productions
-hy productions create   Create a new production
-hy productions get      Get production details
-hy productions build    Trigger a build
-hy productions delete   Delete a production
+### Productions
 
-hy assets list      List assets
-hy assets upload    Upload an asset
-hy assets delete    Delete an asset
+```bash
+hy productions list                     # List all productions
+hy productions list --status draft      # Filter by status
+hy productions get prod_xxx             # Get production details
+hy productions create --name "..." --topic "..."  # Create production
+hy productions build prod_xxx           # Trigger build
+hy productions status prod_xxx          # Check build status
+hy productions delete prod_xxx          # Delete (soft delete)
+```
 
-hy keys create      Create an API key
-hy keys list        List API keys
-hy keys revoke      Revoke an API key
+Aliases: `prod`, `p`
 
-hy thread           Start interactive chat
-hy thread send      Send a single message
+### Assets
 
-hy config set       Set configuration
-hy config get       Get configuration
-hy version          Show version
+```bash
+hy assets list                    # List all assets
+hy assets list --type video       # Filter by type
+hy assets upload ./intro.mp4      # Upload a file
+hy assets get asset_xxx           # Get asset + download URL
+hy assets delete asset_xxx        # Delete asset
+```
+
+Aliases: `asset`, `a`
+
+### API Keys
+
+```bash
+hy keys list              # List API keys
+hy keys create --name "CI"  # Create new key
+hy keys revoke key_xxx    # Revoke key
+```
+
+### Thread (AI Chat)
+
+```bash
+hy thread chat "How should I structure my video?"
+hy thread chat -p prod_xxx "Make the hook more engaging"
+hy thread chat              # Interactive mode
+hy thread history           # View chat history
 ```
 
 ## Configuration
 
-Config is stored at `~/.config/hy/config.yaml`:
+Config file: `~/.config/hy/config.yaml`
 
 ```yaml
 api_url: https://studio.hypewell.ai/api
-workspace_id: ws_abc123
+workspace_id: ws_xxx
 ```
 
-Credentials are stored in the system keychain.
+API key is stored securely in your system keychain.
 
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `HY_API_KEY` | API key (overrides stored auth) |
-| `HY_API_URL` | API base URL |
-| `HY_WORKSPACE` | Workspace ID |
+- `HY_API_KEY` - Override API key
+- `HY_API_URL` - Override API URL
+- `HY_WORKSPACE_ID` - Override workspace ID
 
-## Development
+## Build from Source
 
 ```bash
-# Build
+git clone https://github.com/hypewell-ai/hy.git
+cd hy
 go build -o hy .
-
-# Run tests
-go test ./...
-
-# Install locally
-go install .
 ```
 
 ## License
 
-Proprietary. © 2026 Hypewell AI.
+Proprietary - Hypewell AI

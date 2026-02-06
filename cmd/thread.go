@@ -15,15 +15,22 @@ import (
 
 var threadCmd = &cobra.Command{
 	Use:   "thread",
-	Short: "Interactive AI chat",
-	Long: `Start an interactive chat session with the Hypewell AI assistant.
+	Short: "Chat with AI assistant",
+	Long: `Start a conversation with the AI assistant.
 
-For production-specific context, use --production flag.
+Use workspace-level thread for general questions, or specify a production
+for context-aware assistance with your video script.`,
+}
+
+var threadChatCmd = &cobra.Command{
+	Use:   "chat [message]",
+	Short: "Send a message to the thread",
+	Long: `Send a message and get a response from the AI assistant.
 
 Examples:
-  hy thread
-  hy thread --production prod_abc123
-  hy thread send "How do I improve my hook?"`,
+  hy thread chat "How should I structure my video?"
+  hy thread chat --production prod_xxx "Make the hook more engaging"
+  hy thread chat  # Interactive mode`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		apiKey := GetAPIKey()
 		if apiKey == "" {
@@ -31,83 +38,98 @@ Examples:
 		}
 
 		workspaceID := GetWorkspaceID()
+		if workspaceID == "" {
+			return fmt.Errorf("no workspace configured. Run 'hy auth login' first")
+		}
+
 		productionID, _ := cmd.Flags().GetString("production")
 
-		fmt.Println("Hypewell AI Assistant")
-		fmt.Println("Type 'exit' or Ctrl+C to quit")
-		fmt.Println()
-
-		reader := bufio.NewReader(os.Stdin)
-
-		for {
-			fmt.Print("You: ")
-			input, err := reader.ReadString('\n')
-			if err != nil {
-				if err == io.EOF {
-					fmt.Println()
-					return nil
-				}
-				return err
-			}
-
-			input = strings.TrimSpace(input)
-			if input == "" {
-				continue
-			}
-			if input == "exit" || input == "quit" {
-				return nil
-			}
-
-			// Send message
-			response, err := sendThreadMessage(apiKey, workspaceID, productionID, input)
-			if err != nil {
-				fmt.Printf("Error: %v\n\n", err)
-				continue
-			}
-
-			fmt.Printf("\nAssistant: %s\n\n", response)
+		// Build URL
+		var url string
+		if productionID != "" {
+			url = fmt.Sprintf("%s/workspaces/%s/productions/%s/thread", GetAPIURL(), workspaceID, productionID)
+		} else {
+			url = fmt.Sprintf("%s/workspaces/%s/thread", GetAPIURL(), workspaceID)
 		}
+
+		// Interactive mode if no message provided
+		if len(args) == 0 {
+			return interactiveChat(url, apiKey, productionID)
+		}
+
+		message := strings.Join(args, " ")
+		return sendChatMessage(url, apiKey, message)
 	},
 }
 
-var threadSendCmd = &cobra.Command{
-	Use:   "send [message]",
-	Short: "Send a single message",
-	Long: `Send a single message and get a response.
-
-Examples:
-  hy thread send "What makes a good hook?"
-  hy thread send --production prod_abc123 "Improve my script"`,
-	Args: cobra.ExactArgs(1),
+var threadHistoryCmd = &cobra.Command{
+	Use:   "history",
+	Short: "View chat history",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		message := args[0]
-
 		apiKey := GetAPIKey()
 		if apiKey == "" {
 			return fmt.Errorf("not authenticated. Run 'hy auth login' first")
 		}
 
 		workspaceID := GetWorkspaceID()
-		productionID, _ := cmd.Flags().GetString("production")
-
-		response, err := sendThreadMessage(apiKey, workspaceID, productionID, message)
-		if err != nil {
-			return err
+		if workspaceID == "" {
+			return fmt.Errorf("no workspace configured. Run 'hy auth login' first")
 		}
 
-		fmt.Println(response)
+		productionID, _ := cmd.Flags().GetString("production")
+		limit, _ := cmd.Flags().GetInt("limit")
+
+		var url string
+		if productionID != "" {
+			url = fmt.Sprintf("%s/workspaces/%s/productions/%s/thread?limit=%d", GetAPIURL(), workspaceID, productionID, limit)
+		} else {
+			url = fmt.Sprintf("%s/workspaces/%s/thread?limit=%d", GetAPIURL(), workspaceID, limit)
+		}
+
+		req, _ := http.NewRequest("GET", url, nil)
+		req.Header.Set("Authorization", apiKey)
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return fmt.Errorf("request failed: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			return fmt.Errorf("API error (%d): %s", resp.StatusCode, string(body))
+		}
+
+		var result struct {
+			Messages []struct {
+				ID        string `json:"id"`
+				Role      string `json:"role"`
+				Content   string `json:"content"`
+				CreatedAt string `json:"createdAt"`
+			} `json:"messages"`
+		}
+		json.NewDecoder(resp.Body).Decode(&result)
+
+		if len(result.Messages) == 0 {
+			fmt.Println("No messages in thread")
+			return nil
+		}
+
+		for _, msg := range result.Messages {
+			prefix := "You:"
+			if msg.Role == "assistant" {
+				prefix = "AI:"
+			} else if msg.Role == "system" {
+				prefix = "System:"
+			}
+			fmt.Printf("\n%s\n%s\n", prefix, msg.Content)
+		}
+
 		return nil
 	},
 }
 
-func sendThreadMessage(apiKey, workspaceID, productionID, message string) (string, error) {
-	var url string
-	if productionID != "" {
-		url = fmt.Sprintf("%s/workspaces/%s/productions/%s/thread", GetAPIURL(), workspaceID, productionID)
-	} else {
-		url = fmt.Sprintf("%s/workspaces/%s/thread", GetAPIURL(), workspaceID)
-	}
-
+func sendChatMessage(url, apiKey, message string) error {
 	payload := map[string]string{"message": message}
 	body, _ := json.Marshal(payload)
 
@@ -115,35 +137,86 @@ func sendThreadMessage(apiKey, workspaceID, productionID, message string) (strin
 	req.Header.Set("Authorization", apiKey)
 	req.Header.Set("Content-Type", "application/json")
 
+	fmt.Println("Thinking...")
+
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("request failed: %w", err)
+		return fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
-	respBody, _ := io.ReadAll(resp.Body)
-
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("API error (%d): %s", resp.StatusCode, string(respBody))
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("API error (%d): %s", resp.StatusCode, string(respBody))
 	}
 
 	var result struct {
 		AssistantMessage struct {
 			Content string `json:"content"`
 		} `json:"assistantMessage"`
+		SuggestedChanges []struct {
+			Type        string `json:"type"`
+			Description string `json:"description"`
+		} `json:"suggestedChanges"`
+	}
+	json.NewDecoder(resp.Body).Decode(&result)
+
+	fmt.Printf("\n%s\n", result.AssistantMessage.Content)
+
+	if len(result.SuggestedChanges) > 0 {
+		fmt.Println("\n📝 Suggested changes:")
+		for _, change := range result.SuggestedChanges {
+			fmt.Printf("  • %s\n", change.Description)
+		}
 	}
 
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		return "", fmt.Errorf("failed to parse response: %w", err)
+	return nil
+}
+
+func interactiveChat(url, apiKey, productionID string) error {
+	if productionID != "" {
+		fmt.Printf("Chatting with production: %s\n", productionID)
+	} else {
+		fmt.Println("Chatting with workspace assistant")
+	}
+	fmt.Println("Type 'exit' or 'quit' to end the conversation.\n")
+
+	scanner := bufio.NewScanner(os.Stdin)
+
+	for {
+		fmt.Print("You: ")
+		if !scanner.Scan() {
+			break
+		}
+
+		message := strings.TrimSpace(scanner.Text())
+		if message == "" {
+			continue
+		}
+
+		if message == "exit" || message == "quit" {
+			fmt.Println("Goodbye!")
+			break
+		}
+
+		if err := sendChatMessage(url, apiKey, message); err != nil {
+			fmt.Printf("Error: %v\n", err)
+		}
+		fmt.Println()
 	}
 
-	return result.AssistantMessage.Content, nil
+	return nil
 }
 
 func init() {
 	rootCmd.AddCommand(threadCmd)
-	threadCmd.AddCommand(threadSendCmd)
+	threadCmd.AddCommand(threadChatCmd)
+	threadCmd.AddCommand(threadHistoryCmd)
 
-	threadCmd.Flags().String("production", "", "Production ID for context")
-	threadSendCmd.Flags().String("production", "", "Production ID for context")
+	// Chat flags
+	threadChatCmd.Flags().StringP("production", "p", "", "Production ID for context-aware chat")
+
+	// History flags
+	threadHistoryCmd.Flags().StringP("production", "p", "", "Production ID")
+	threadHistoryCmd.Flags().Int("limit", 20, "Number of messages to fetch")
 }
