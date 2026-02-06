@@ -106,6 +106,14 @@ func TestProductionsBuild(t *testing.T) {
 	tc := SetupTest(t)
 	defer tc.Cleanup()
 
+	// Build now does a GET first to validate spec exists
+	tc.Server.HandleJSON("GET", "/workspaces/ws_test123/productions/prod_abc123", http.StatusOK, map[string]interface{}{
+		"id":     "prod_abc123",
+		"name":   "Test Production",
+		"status": "draft",
+		"spec":   map[string]interface{}{"version": "2.0"},
+	})
+
 	tc.Server.HandleJSON("POST", "/workspaces/ws_test123/productions/prod_abc123/build", http.StatusAccepted, map[string]interface{}{
 		"id":      "prod_abc123",
 		"status":  "building",
@@ -219,6 +227,14 @@ func TestProductionsBuildConflict(t *testing.T) {
 	tc := SetupTest(t)
 	defer tc.Cleanup()
 
+	// Build now does a GET first
+	tc.Server.HandleJSON("GET", "/workspaces/ws_test123/productions/prod_abc123", http.StatusOK, map[string]interface{}{
+		"id":     "prod_abc123",
+		"name":   "Test Production",
+		"status": "building",
+		"spec":   map[string]interface{}{"version": "2.0"},
+	})
+
 	tc.Server.HandleJSON("POST", "/workspaces/ws_test123/productions/prod_abc123/build", http.StatusConflict, map[string]interface{}{
 		"error":  "Build already in progress",
 		"status": "building",
@@ -246,5 +262,64 @@ func TestProductionsGetNotFound(t *testing.T) {
 
 	if err == nil {
 		t.Error("Expected error for not found")
+	}
+}
+
+func TestProductionsCreateDryRun(t *testing.T) {
+	tc := SetupTest(t)
+	defer tc.Cleanup()
+
+	// No server handler needed - dry-run doesn't make API calls
+
+	output, err := ExecuteCommand("productions", "create", "--name", "Test", "--topic", "Test topic", "--dry-run")
+	if err != nil {
+		t.Fatalf("Command failed: %v", err)
+	}
+
+	AssertContains(t, output, "[dry-run]")
+	AssertContains(t, output, "Test")
+	AssertContains(t, output, "Test topic")
+}
+
+func TestProductionsBuildValidateOnly(t *testing.T) {
+	tc := SetupTest(t)
+	defer tc.Cleanup()
+
+	tc.Server.HandleJSON("GET", "/workspaces/ws_test123/productions/prod_abc123", http.StatusOK, map[string]interface{}{
+		"id":     "prod_abc123",
+		"name":   "Test Production",
+		"status": "draft",
+		"spec":   map[string]interface{}{"version": "2.0"},
+	})
+
+	// No POST handler needed - validate-only doesn't trigger build
+
+	output, err := ExecuteCommand("productions", "build", "prod_abc123", "--validate-only")
+	if err != nil {
+		t.Fatalf("Command failed: %v", err)
+	}
+
+	AssertContains(t, output, "[validate-only]")
+	AssertContains(t, output, "ready to build")
+}
+
+func TestProductionsBuildNoSpec(t *testing.T) {
+	tc := SetupTest(t)
+	defer tc.Cleanup()
+
+	tc.Server.HandleJSON("GET", "/workspaces/ws_test123/productions/prod_abc123", http.StatusOK, map[string]interface{}{
+		"id":     "prod_abc123",
+		"name":   "Test Production",
+		"status": "draft",
+		"spec":   nil,
+	})
+
+	_, err := ExecuteCommand("productions", "build", "prod_abc123")
+
+	if err == nil {
+		t.Error("Expected error for missing spec")
+	}
+	if !strings.Contains(err.Error(), "no spec") {
+		t.Errorf("Error should mention missing spec: %v", err)
 	}
 }

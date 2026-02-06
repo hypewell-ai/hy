@@ -154,6 +154,7 @@ var productionsCreateCmd = &cobra.Command{
 		topic, _ := cmd.Flags().GetString("topic")
 		category, _ := cmd.Flags().GetString("category")
 		specFile, _ := cmd.Flags().GetString("spec")
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
 
 		if name == "" || topic == "" {
 			return fmt.Errorf("--name and --topic are required")
@@ -179,6 +180,20 @@ var productionsCreateCmd = &cobra.Command{
 				return fmt.Errorf("invalid spec JSON: %w", err)
 			}
 			payload["spec"] = spec
+		}
+
+		// Dry run - just validate and show what would be created
+		if dryRun {
+			fmt.Println("[dry-run] Would create production:")
+			fmt.Printf("  Name:     %s\n", name)
+			fmt.Printf("  Topic:    %s\n", topic)
+			if category != "" {
+				fmt.Printf("  Category: %s\n", category)
+			}
+			if specFile != "" {
+				fmt.Printf("  Spec:     %s\n", specFile)
+			}
+			return nil
 		}
 
 		body, _ := json.Marshal(payload)
@@ -229,6 +244,47 @@ var productionsBuildCmd = &cobra.Command{
 		}
 
 		workspaceID := GetWorkspaceID()
+		validateOnly, _ := cmd.Flags().GetBool("validate-only")
+
+		// First, get the production to check if it has a spec
+		getURL := fmt.Sprintf("%s/workspaces/%s/productions/%s", GetAPIURL(), workspaceID, productionID)
+		getReq, _ := http.NewRequest("GET", getURL, nil)
+		getReq.Header.Set("Authorization", apiKey)
+
+		getResp, err := http.DefaultClient.Do(getReq)
+		if err != nil {
+			return fmt.Errorf("request failed: %w", err)
+		}
+		defer getResp.Body.Close()
+
+		if getResp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(getResp.Body)
+			return fmt.Errorf("API error (%d): %s", getResp.StatusCode, string(body))
+		}
+
+		var production struct {
+			ID     string                 `json:"id"`
+			Name   string                 `json:"name"`
+			Status string                 `json:"status"`
+			Spec   map[string]interface{} `json:"spec"`
+		}
+		json.NewDecoder(getResp.Body).Decode(&production)
+
+		// Validate spec exists
+		if production.Spec == nil {
+			return fmt.Errorf("production has no spec. Add a spec before building")
+		}
+
+		// Validate-only mode - check spec but don't trigger build
+		if validateOnly {
+			fmt.Printf("[validate-only] Production %s is ready to build\n", productionID)
+			fmt.Printf("  Name:   %s\n", production.Name)
+			fmt.Printf("  Status: %s\n", production.Status)
+			fmt.Println("  Spec:   ✓ valid")
+			return nil
+		}
+
+		// Trigger actual build
 		url := fmt.Sprintf("%s/workspaces/%s/productions/%s/build", GetAPIURL(), workspaceID, productionID)
 
 		req, _ := http.NewRequest("POST", url, nil)
@@ -393,6 +449,10 @@ func init() {
 	productionsCreateCmd.Flags().String("topic", "", "Production topic (required)")
 	productionsCreateCmd.Flags().String("category", "", "Production category")
 	productionsCreateCmd.Flags().String("spec", "", "Path to SFSY spec JSON file")
+	productionsCreateCmd.Flags().Bool("dry-run", false, "Validate inputs without creating")
+
+	// Build flags
+	productionsBuildCmd.Flags().Bool("validate-only", false, "Check spec validity without triggering build")
 
 	// Delete flags
 	productionsDeleteCmd.Flags().Bool("force", false, "Skip confirmation prompt")
