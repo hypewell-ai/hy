@@ -1,19 +1,30 @@
 # hy - Hypewell Studio CLI
 
-Command-line interface for Hypewell Studio.
+[![Release](https://img.shields.io/github/v/release/hypewell-ai/hy)](https://github.com/hypewell-ai/hy/releases)
+[![Go](https://img.shields.io/badge/go-1.23+-blue)](https://go.dev/)
+
+Command-line interface for [Hypewell Studio](https://studio.hypewell.ai).
 
 ## Installation
 
-### Homebrew (macOS)
+### Homebrew (macOS/Linux)
 
 ```bash
-brew tap hypewell-ai/tap
-brew install hy
+brew install hypewell-ai/tap/hy
 ```
 
 ### Binary Download
 
-Download the latest release from [GitHub Releases](https://github.com/hypewell-ai/hy/releases).
+Download the latest release for your platform from [GitHub Releases](https://github.com/hypewell-ai/hy/releases):
+
+| Platform | Architecture | Download |
+|----------|--------------|----------|
+| macOS | Apple Silicon | `hy_*_darwin_arm64.tar.gz` |
+| macOS | Intel | `hy_*_darwin_amd64.tar.gz` |
+| Linux | x86_64 | `hy_*_linux_amd64.tar.gz` |
+| Linux | ARM64 | `hy_*_linux_arm64.tar.gz` |
+| Windows | x86_64 | `hy_*_windows_amd64.zip` |
+| Windows | ARM64 | `hy_*_windows_arm64.zip` |
 
 ## Quick Start
 
