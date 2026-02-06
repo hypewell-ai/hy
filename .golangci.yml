@@ -1,0 +1,37 @@
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - errcheck      # Check for unchecked errors
+    - gosimple      # Simplify code
+    - govet         # Suspicious constructs
+    - ineffassign   # Unused assignments
+    - staticcheck   # Static analysis
+    - unused        # Unused code
+    - gofmt         # Formatting
+    - goimports     # Import ordering
+    - misspell      # Spelling mistakes
+    - unparam       # Unused parameters
+    - gocritic      # Opinionated linter
+
+linters-settings:
+  errcheck:
+    check-blank: true
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+
+issues:
+  exclude-rules:
+    # Test files can have unused parameters
+    - path: _test\.go
+      linters:
+        - unparam
+    # Allow fmt.Println in CLI commands
+    - path: cmd/
+      text: "fmt.Print"
+      linters:
+        - forbidigo
