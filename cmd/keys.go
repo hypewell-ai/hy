@@ -151,6 +151,18 @@ var keysRevokeCmd = &cobra.Command{
 			return fmt.Errorf("not authenticated. Run 'hy auth login' first")
 		}
 
+		// Confirm unless --force
+		force, _ := cmd.Flags().GetBool("force")
+		if !force {
+			fmt.Printf("Revoke API key %s? This cannot be undone. [y/N] ", keyID)
+			var confirm string
+			fmt.Scanln(&confirm)
+			if confirm != "y" && confirm != "Y" && confirm != "yes" {
+				fmt.Println("Cancelled")
+				return nil
+			}
+		}
+
 		workspaceID := GetWorkspaceID()
 		url := fmt.Sprintf("%s/workspaces/%s/keys/%s", GetAPIURL(), workspaceID, keyID)
 
@@ -168,7 +180,7 @@ var keysRevokeCmd = &cobra.Command{
 			return fmt.Errorf("API error (%d): %s", resp.StatusCode, string(body))
 		}
 
-		fmt.Printf("✓ API key %s revoked\n", keyID)
+		fmt.Printf("✓ Revoked API key: %s\n", keyID)
 		return nil
 	},
 }
@@ -181,4 +193,5 @@ func init() {
 
 	keysCreateCmd.Flags().String("name", "", "Key name (required)")
 	keysCreateCmd.Flags().StringSlice("scopes", []string{"productions:read", "assets:read"}, "Key scopes")
+	keysRevokeCmd.Flags().Bool("force", false, "Skip confirmation prompt")
 }

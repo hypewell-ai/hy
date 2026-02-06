@@ -179,7 +179,8 @@ func interactiveChat(url, apiKey, productionID string) error {
 	} else {
 		fmt.Println("Chatting with workspace assistant")
 	}
-	fmt.Println("Type 'exit' or 'quit' to end the conversation.\n")
+	fmt.Println("Type 'exit' or 'quit' to end the conversation.")
+	fmt.Println()
 
 	scanner := bufio.NewScanner(os.Stdin)
 
