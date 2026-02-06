@@ -49,6 +49,7 @@ changelog:
 
 brews:
   - name: hy
+    directory: Formula
     repository:
       owner: hypewell-ai
       name: homebrew-tap
